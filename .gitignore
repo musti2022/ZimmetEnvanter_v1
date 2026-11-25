@@ -1,0 +1,17 @@
+node_modules/
+dist/
+*.log
+server/server.log
+.DS_Store
+
+# Gerçek kimlik bilgileri (AD service account parolası, oturum anahtarı) ASLA depoya girmez.
+# Şablon için .env.example dosyasına bakın.
+.env
+.env.*
+!.env.example
+*.pem
+*.pfx
+
+# HTTPS için otomatik üretilen kendinden imzalı sertifikalar
+server/sertifika/
+
