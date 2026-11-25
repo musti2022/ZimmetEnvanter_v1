@@ -818,13 +818,18 @@ export default function App() {
     bildir('ok', 'Kayıt forma yüklendi. Değişiklikleri yapıp "Güncelle" deyin.')
   }
 
+  // Kayıtlı PDF klasörüne izni arka planda ister. Sonuç beklenmeden silme yapılabilir.
+  const klasorIzniArkaPlanda = (klasor) =>
+    dosyaSistemiDestekli() ? kayitKlasoruVarsa(klasor).catch(() => null) : Promise.resolve(null)
+  // İzin balonu hiç cevaplanmazsa sonsuza dek beklememek için süre sınırı.
+  const sureyleBekle = (soz, ms = 8000) =>
+    Promise.race([soz, new Promise((coz) => setTimeout(() => coz(null), ms))])
+
   const cepSil = (k) => {
     onayIste(`"${k.adSoyad || '(isimsiz)'}" cep telefonu kaydı ve klasördeki PDF'i silinsin mi?`, async () => {
-      // Klasör erişimi kullanıcı jesti tazeyken (API beklemesinden ÖNCE) alınır
-      let dir = null
-      if (dosyaSistemiDestekli()) {
-        try { dir = await kayitKlasoruVarsa(CEP_KLASORU) } catch { dir = null }
-      }
+      // Klasör izni jest tazeyken İSTENİR ama BEKLENMEZ: tarayıcının izin balonu
+      // cevaplanmasa bile kayıt silinir; PDF yalnızca izin gelirse silinir.
+      const dirSoz = klasorIzniArkaPlanda(CEP_KLASORU)
       try {
         await api.cepSil(k.id)
       } catch (hata) {
@@ -832,6 +837,7 @@ export default function App() {
       }
       if (cepForm.id === k.id) { setCepForm(bosCepKayit()); setCepFormAcik(false) }
       await tumuYukle({ sessiz: true })
+      const dir = await sureyleBekle(dirSoz)
       if (!dir) return bildir('ok', 'Kayıt silindi.')
       try {
         await dosyaSil(dir, cepDosyaAdiUret(k))
@@ -1205,11 +1211,9 @@ export default function App() {
     onayIste(
       `Bu belge (${belge.belgeNo || '—'}) ve klasördeki ilgili PDF dosyası silinsin mi? Üzerindeki zimmetli ürünler otomatik iade edilmiş sayılacak.`,
       async () => {
-        // Klasör erişimi kullanıcı jesti tazeyken (API beklemesinden ÖNCE) alınır
-        let dir = null
-        if (dosyaSistemiDestekli()) {
-          try { dir = await kayitKlasoruVarsa() } catch { dir = null }
-        }
+        // Klasör izni jest tazeyken İSTENİR ama BEKLENMEZ: tarayıcının izin balonu
+        // cevaplanmasa bile belge silinir; PDF yalnızca izin gelirse silinir.
+        const dirSoz = klasorIzniArkaPlanda()
 
         try {
           await api.belgeSil(id) // iade hareketleri sunucuda yazılır
@@ -1223,8 +1227,9 @@ export default function App() {
           bildir('ok', 'Belge silindi. (PDF bu tarayıcıda yönetilmiyor; varsa İndirilenler\'den elle silin.)')
           return
         }
+        const dir = await sureyleBekle(dirSoz)
         try {
-          if (!dir) { bildir('ok', 'Belge silindi. (PDF klasörü seçili olmadığı için dosya silinmedi.)'); return }
+          if (!dir) { bildir('ok', 'Belge silindi. (PDF klasörü seçili olmadığı ya da izin verilmediği için dosya silinmedi.)'); return }
           await dosyaSil(dir, dosyaAdiUret(belge))
           bildir('ok', 'Belge ve PDF dosyası silindi; zimmetli ürünler iade edildi.')
         } catch (e) {
