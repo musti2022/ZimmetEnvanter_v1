@@ -431,7 +431,11 @@ export default function App() {
   const urunSil = (u) => {
     if (zimmetliAdet(u.id) > 0)
       return bildir('hata', `"${u.ad}" üzerinde aktif zimmet var, önce iade alınmalı.`)
-    onayIste(`"${u.ad}" envanterden kalıcı olarak silinsin mi?`, async () => {
+    const gecmisBelge = belgeler.filter((b) => b.items.some((it) => it.urunId === u.id)).length
+    const ek = gecmisBelge
+      ? ` Bu ürünün ${gecmisBelge} zimmet belgesi var; belgeler silinmez, Zimmet listesinde "(silinmiş ürün)" olarak görünür ve oradan ayrıca silinebilir.`
+      : ''
+    onayIste(`"${u.ad}" envanterden kalıcı olarak silinsin mi?${ek}`, async () => {
       try {
         await api.urunSil(u.id)
         if (duzenlenenId === u.id) { setUrunForm(bosUrun()); setDuzenlenenId(null); setFormAcik(false) }
@@ -1216,16 +1220,16 @@ export default function App() {
         await tumuYukle({ sessiz: true })
 
         if (!dosyaSistemiDestekli()) {
-          bildir('hata', 'Belge silindi. (PDF tarayıcı tarafından yönetilmiyor; varsa İndirilenler\'den elle silin.)')
+          bildir('ok', 'Belge silindi. (PDF bu tarayıcıda yönetilmiyor; varsa İndirilenler\'den elle silin.)')
           return
         }
         try {
-          if (!dir) { bildir('hata', 'Belge silindi. PDF klasörüne erişilemediği için dosya silinemedi.'); return }
+          if (!dir) { bildir('ok', 'Belge silindi. (PDF klasörü seçili olmadığı için dosya silinmedi.)'); return }
           await dosyaSil(dir, dosyaAdiUret(belge))
           bildir('ok', 'Belge ve PDF dosyası silindi; zimmetli ürünler iade edildi.')
         } catch (e) {
-          if (e?.name === 'NotFoundError') bildir('hata', 'Belge silindi. (PDF dosyası klasörde bulunamadı.)')
-          else if (e?.name === 'AbortError') bildir('hata', 'Belge silindi. (Klasör izni verilmediği için PDF silinemedi.)')
+          if (e?.name === 'NotFoundError') bildir('ok', 'Belge silindi. (PDF dosyası klasörde bulunamadı.)')
+          else if (e?.name === 'AbortError') bildir('ok', 'Belge silindi. (Klasör izni verilmediği için PDF silinmedi.)')
           else { console.error(e); bildir('hata', 'Belge silindi; PDF silinemedi: ' + (e?.message || e)) }
         }
       }
@@ -1355,9 +1359,13 @@ export default function App() {
     const zaman = (b) => String(b.olusturma || b.teslimTarihi || '')
     const tumKalemler = belgeler.flatMap((b) => b.items.map((it) => ({ b, it })))
     const urunKalemleri = new Map()
+    const mevcutUrun = new Set(urunler.map((u) => u.id))
     for (const k of tumKalemler) {
-      if (!urunKalemleri.has(k.it.urunId)) urunKalemleri.set(k.it.urunId, [])
-      urunKalemleri.get(k.it.urunId).push(k)
+      // Ürünü envanterden silinmiş kalemler birbirine bağlanmaz: her biri kendi satırında
+      // görünür, böylece yanlış açılmış belgeler tek tek görülüp silinebilir.
+      const anahtar = mevcutUrun.has(k.it.urunId) ? k.it.urunId : `silinmis:${k.it.id}`
+      if (!urunKalemleri.has(anahtar)) urunKalemleri.set(anahtar, [])
+      urunKalemleri.get(anahtar).push(k)
     }
     for (const l of urunKalemleri.values()) l.sort((x, y) => zaman(y.b).localeCompare(zaman(x.b))) // yeniden eskiye
     const gorunur = new Set()
@@ -1377,7 +1385,7 @@ export default function App() {
       if (!b.items.length) return [{ b, it: null }]
       return b.items.filter((it) => gorunur.has(it.id)).map((it) => ({ b, it, onceki: onceki.get(it.id) || '' }))
     })
-  }, [gosterilenBelgeler, belgeler])
+  }, [gosterilenBelgeler, belgeler, urunler])
 
   const suzulmusHareketler = useMemo(() => {
     let l = hareketler
