@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
-import ImzaPad from './ImzaPad.jsx'
 import { fotodanKodOku } from './barkodOku.js'
 import CanliTarayici, { kameraDestekli } from './CanliTarayici.jsx'
 import { bosKalem, isoTarih, norm } from './yardimci.js'
@@ -289,7 +288,7 @@ export default function ZimmetForm({ form, setForm, urunler, maksAdet, teslimTar
         />
       )}
 
-      <h2 className="panel-baslik">İmza</h2>
+      <h2 className="panel-baslik">Teslim Bilgileri</h2>
       <div className="grid-3">
         <Field label="Teslim Alan">
           <input value={form.teslimAlan} onChange={(e) => alanGuncelle('teslimAlan', e.target.value)} placeholder="Ad Soyad" />
@@ -297,10 +296,6 @@ export default function ZimmetForm({ form, setForm, urunler, maksAdet, teslimTar
         <Field label="Teslim Eden">
           <input value={form.teslimEden} onChange={(e) => alanGuncelle('teslimEden', e.target.value)} placeholder="Ad Soyad" />
         </Field>
-      </div>
-      <div className="imza-pad-grid">
-        <ImzaPad label="Teslim Alan imzası" value={form.imzaAlan} onChange={(v) => alanGuncelle('imzaAlan', v)} />
-        <ImzaPad label="Teslim Eden imzası" value={form.imzaEden} onChange={(v) => alanGuncelle('imzaEden', v)} />
       </div>
     </section>
   )
