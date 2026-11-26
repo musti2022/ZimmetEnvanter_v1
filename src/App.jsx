@@ -128,6 +128,7 @@ export default function App() {
   const [tutanakId, setTutanakId] = useState(null)
   const [cepTutanakId, setCepTutanakId] = useState(null) // listeden tutanağı görüntülenen cep kaydı
   const [belgeDetayId, setBelgeDetayId] = useState(null) // detay penceresi açık zimmet belgesi
+  const [islemMenu, setIslemMenu] = useState(null) // zimmet satırındaki ⋯ menüsü: { anahtar, x, y }
   const [cepDetayId, setCepDetayId] = useState(null) // detay penceresi açık cep kaydı
   const cepTutanakRef = useRef(null)
   const [onay, setOnay] = useState(null)
@@ -1209,7 +1210,7 @@ export default function App() {
     const belge = belgeler.find((b) => b.id === id)
     if (!belge) return
     onayIste(
-      `Bu belge (${belge.belgeNo || '—'}) ve klasördeki ilgili PDF dosyası silinsin mi? Üzerindeki zimmetli ürünler otomatik iade edilmiş sayılacak.`,
+      `Bu belge (${belge.belgeNo || '—'}) ve klasördeki PDF dosyası kalıcı olarak silinsin mi? Bu işlem geri alınamaz ve belge geçmişten kalkar. Cihaz gerçekten geri geldiyse Sil yerine "İade Al" kullanın. Üzerindeki zimmetli ürünler otomatik iade edilmiş sayılacak.`,
       async () => {
         // Klasör izni jest tazeyken İSTENİR ama BEKLENMEZ: tarayıcının izin balonu
         // cevaplanmasa bile belge silinir; PDF yalnızca izin gelirse silinir.
@@ -2123,19 +2124,23 @@ export default function App() {
                               : 'Evet'}</td>
                             <td data-label="Teslim Tarihi">{trTarih(b.teslimTarihi)}</td>
                             <td className="islem">
-                              <button className="btn btn-ghost sm" onClick={() => setBelgeDetayId(b.id)} title="Belgenin tüm bilgileri ve ürünleri">Detay</button>
-                              <button className="btn btn-ikincil sm" onClick={() => kayitYukle(b.id)} title="Belgeyi forma yükleyip güncelle">Güncelle</button>
                               {it && !iade && (
-                                <button className="btn btn-ghost sm" onClick={() => belgeIadeAl(b, [it])} title="Bu ürünü iade al; stokta boşta görünür">İade Al</button>
+                                <button className="btn btn-ana sm" onClick={() => belgeIadeAl(b, [it])} title="Bu ürünü iade al; iade tutanağı oluşur, ürün boşta görünür">İade Al</button>
                               )}
-                              {it && iade && (
-                                <button className="btn btn-ikincil sm" onClick={() => belgedenZimmetle(b, [it])} title="İade alınan ürünü yeni bir kişiye zimmetle">Zimmetle</button>
+                              {it && iade && u && (
+                                <button className="btn btn-ana sm" onClick={() => belgedenZimmetle(b, [it])} title="İade alınan ürünü yeni bir kişiye zimmetle">Zimmetle</button>
                               )}
-                              {it && iade
-                                ? <button className="btn btn-ghost sm" title="En son iade tutanağını görüntüle"
-                                    onClick={() => setIadeOnizleme({ belge: b, kalemler: [it], iadeTarihi: it.iadeTarihi, teslimAlan: '' })}>İade Tutanağı</button>
-                                : <button className="btn btn-ghost sm" onClick={() => setTutanakId(b.id)}>Tutanak</button>}
-                              <button className="btn sm btn-sil" onClick={() => kayitSil(b.id)}>Sil</button>
+                              <button className="btn btn-ghost sm" onClick={() => setBelgeDetayId(b.id)} title="Belgenin tüm bilgileri ve ürünleri">Detay</button>
+                              <button
+                                className="btn btn-ghost sm islem-diger"
+                                aria-label="Diğer işlemler" title="Diğer işlemler"
+                                onClick={(e) => {
+                                  const anahtar = `${b.id}-${it?.id || 'bos'}`
+                                  if (islemMenu?.anahtar === anahtar) return setIslemMenu(null)
+                                  const r = e.currentTarget.getBoundingClientRect()
+                                  setIslemMenu({ anahtar, b, it, iade, x: Math.max(8, r.right - 210), y: r.bottom + 4 })
+                                }}
+                              >⋯</button>
                             </td>
                           </tr>
                         )
@@ -2811,6 +2816,22 @@ export default function App() {
         />
       )}
 
+      {islemMenu && (
+        <div className="islem-menu-perde" onClick={() => setIslemMenu(null)}>
+          <div className="islem-menu" style={{ left: islemMenu.x, top: islemMenu.y }} onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => { const { b } = islemMenu; setIslemMenu(null); kayitYukle(b.id) }}>✏️ Güncelle</button>
+            <button onClick={() => { const { b } = islemMenu; setIslemMenu(null); setTutanakId(b.id) }}>📄 Zimmet Tutanağı</button>
+            {islemMenu.it && islemMenu.iade && (
+              <button onClick={() => {
+                const { b, it } = islemMenu; setIslemMenu(null)
+                setIadeOnizleme({ belge: b, kalemler: [it], iadeTarihi: it.iadeTarihi, teslimAlan: '' })
+              }}>📄 İade Tutanağı</button>
+            )}
+            <div className="islem-menu-ayrac" />
+            <button className="tehlike" onClick={() => { const { b } = islemMenu; setIslemMenu(null); kayitSil(b.id) }}>🗑 Hatalı kaydı sil</button>
+          </div>
+        </div>
+      )}
       {onay && (
         <div className="perde" onClick={() => setOnay(null)}>
           <div className="pencere dar" onClick={(e) => e.stopPropagation()}>

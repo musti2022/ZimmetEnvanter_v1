@@ -727,3 +727,19 @@ td.tikla:hover b { color: var(--lacivert); text-decoration: underline; }
 .zimmet-kalemleri li { line-height: 1.35; }
 .zimmet-kalemleri li .alt-metin { display: inline; }
 .zimmet-kalemleri li.iade-edildi { opacity: .55; text-decoration: line-through; }
+
+/* Zimmet satırı "⋯ Diğer işlemler" menüsü (tablo kaydırmasında kırpılmasın diye sabit konumlu) */
+.islem-diger { font-weight: 700; letter-spacing: 1px; min-width: 34px; }
+.islem-menu-perde { position: fixed; inset: 0; z-index: 60; }
+.islem-menu {
+  position: fixed; width: 210px; background: #fff; border: 1px solid var(--cizgi, #dfe3ec);
+  border-radius: 10px; box-shadow: 0 10px 30px rgba(20, 30, 60, .18); padding: 6px; display: flex; flex-direction: column;
+}
+.islem-menu button {
+  background: none; border: 0; text-align: left; padding: 9px 10px; border-radius: 7px;
+  font: inherit; font-size: 13.5px; cursor: pointer; color: inherit;
+}
+.islem-menu button:hover { background: #f1f4fa; }
+.islem-menu button.tehlike { color: var(--hata, #c0392b); }
+.islem-menu button.tehlike:hover { background: #fbeceb; }
+.islem-menu-ayrac { height: 1px; background: var(--cizgi, #e6e9f0); margin: 4px 2px; }
