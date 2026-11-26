@@ -128,7 +128,7 @@ export default function App() {
   const [tutanakId, setTutanakId] = useState(null)
   const [cepTutanakId, setCepTutanakId] = useState(null) // listeden tutanağı görüntülenen cep kaydı
   const [belgeDetayId, setBelgeDetayId] = useState(null) // detay penceresi açık zimmet belgesi
-  const [islemMenu, setIslemMenu] = useState(null) // zimmet satırındaki ⋯ menüsü: { anahtar, x, y }
+  const [islemMenu, setIslemMenu] = useState(null) // liste satırlarındaki ⋯ menüsü: { anahtar, x, y, ogeler }
   const [cepDetayId, setCepDetayId] = useState(null) // detay penceresi açık cep kaydı
   const cepTutanakRef = useRef(null)
   const [onay, setOnay] = useState(null)
@@ -826,8 +826,15 @@ export default function App() {
   const sureyleBekle = (soz, ms = 8000) =>
     Promise.race([soz, new Promise((coz) => setTimeout(() => coz(null), ms))])
 
+  // Satırdaki "⋯ Diğer işlemler" menüsünü düğmenin altında açar (aynı düğmeye tekrar basınca kapanır).
+  const islemMenuAc = (e, anahtar, ogeler) => {
+    if (islemMenu?.anahtar === anahtar) return setIslemMenu(null)
+    const r = e.currentTarget.getBoundingClientRect()
+    setIslemMenu({ anahtar, ogeler, x: Math.max(8, r.right - 210), y: r.bottom + 4 })
+  }
+
   const cepSil = (k) => {
-    onayIste(`"${k.adSoyad || '(isimsiz)'}" cep telefonu kaydı ve klasördeki PDF'i silinsin mi?`, async () => {
+    onayIste(`"${k.adSoyad || '(isimsiz)'}" cep telefonu kaydı ve klasördeki PDF kalıcı olarak silinsin mi? Bu işlem geri alınamaz. Telefon gerçekten geri geldiyse Sil yerine "İade Al" kullanın.`, async () => {
       // Klasör izni jest tazeyken İSTENİR ama BEKLENMEZ: tarayıcının izin balonu
       // cevaplanmasa bile kayıt silinir; PDF yalnızca izin gelirse silinir.
       const dirSoz = klasorIzniArkaPlanda(CEP_KLASORU)
@@ -2134,12 +2141,13 @@ export default function App() {
                               <button
                                 className="btn btn-ghost sm islem-diger"
                                 aria-label="Diğer işlemler" title="Diğer işlemler"
-                                onClick={(e) => {
-                                  const anahtar = `${b.id}-${it?.id || 'bos'}`
-                                  if (islemMenu?.anahtar === anahtar) return setIslemMenu(null)
-                                  const r = e.currentTarget.getBoundingClientRect()
-                                  setIslemMenu({ anahtar, b, it, iade, x: Math.max(8, r.right - 210), y: r.bottom + 4 })
-                                }}
+                                onClick={(e) => islemMenuAc(e, `z-${b.id}-${it?.id || 'bos'}`, [
+                                  { etiket: '✏️ Güncelle', eylem: () => kayitYukle(b.id) },
+                                  { etiket: '📄 Zimmet Tutanağı', eylem: () => setTutanakId(b.id) },
+                                  ...(it && iade ? [{ etiket: '📄 İade Tutanağı', eylem: () => setIadeOnizleme({ belge: b, kalemler: [it], iadeTarihi: it.iadeTarihi, teslimAlan: '' }) }] : []),
+                                  '-',
+                                  { etiket: '🗑 Hatalı kaydı sil', tehlike: true, eylem: () => kayitSil(b.id) },
+                                ])}
                               >⋯</button>
                             </td>
                           </tr>
@@ -2332,16 +2340,24 @@ export default function App() {
                             ? <span className="rozet rozet-gri" title={k.iadeTarihi ? `İade: ${trTarih(k.iadeTarihi)}` : ''}>İade edildi{k.iadeTarihi ? ` · ${trTarih(k.iadeTarihi)}` : ''}</span>
                             : <span className="rozet rozet-mavi">Zimmetli</span>}</td>
                           <td className="islem">
+                            {k.durum === 'bosta' && (
+                              <button className="btn btn-ana sm" onClick={() => cepBostaZimmetle(k)} title="Bu telefonu bir kişiye zimmetle">Zimmetle</button>
+                            )}
+                            {k.durum === 'zimmetli' && (
+                              <button className="btn btn-ana sm" onClick={() => cepDurumDegistir(k, 'iade')} title="Telefonu iade al: iade tutanağı oluşturulur, telefon boşta olarak listelenir">İade Al</button>
+                            )}
                             <button className="btn btn-ghost sm" onClick={() => setCepDetayId(k.id)} title="Kaydın tüm bilgileri ve bu telefonun geçmişi">Detay</button>
-                            <button className="btn btn-ikincil sm" onClick={() => cepYukle(k)} title="Kaydı forma yükleyip güncelle">Güncelle</button>
-                            {k.durum === 'bosta'
-                              ? <button className="btn btn-ghost sm" onClick={() => cepBostaZimmetle(k)} title="Bu telefonu bir kişiye zimmetle">Zimmetle</button>
-                              : k.durum === 'iade'
-                              ? null
-                              : <button className="btn btn-ghost sm" onClick={() => cepDurumDegistir(k, 'iade')} title="Telefonu iade al: iade tutanağı oluşturulur, telefon boşta olarak listelenir">İade Al</button>}
-                            {k.durum !== 'bosta' && <button className="btn btn-ghost sm" onClick={() => setCepTutanakId(k.id)} title="Taahhüt ve teslim tutanağını görüntüle, yazdır veya PDF indir">Tutanak</button>}
-                            {k.durum === 'bosta' && cepSonIade(k) && <button className="btn btn-ghost sm" onClick={() => setCepGecmisTutanak({ kayit: cepSonIade(k), tur: 'iade' })} title="En son iade tutanağını görüntüle">İade Tutanağı</button>}
-                            <button className="btn sm btn-sil" onClick={() => cepSil(k)}>Sil</button>
+                            <button
+                              className="btn btn-ghost sm islem-diger"
+                              aria-label="Diğer işlemler" title="Diğer işlemler"
+                              onClick={(e) => islemMenuAc(e, `c-${k.id}`, [
+                                { etiket: '✏️ Güncelle', eylem: () => cepYukle(k) },
+                                ...(k.durum !== 'bosta' ? [{ etiket: '📄 Zimmet Tutanağı', eylem: () => setCepTutanakId(k.id) }] : []),
+                                ...(k.durum === 'bosta' && cepSonIade(k) ? [{ etiket: '📄 İade Tutanağı', eylem: () => setCepGecmisTutanak({ kayit: cepSonIade(k), tur: 'iade' }) }] : []),
+                                '-',
+                                { etiket: '🗑 Hatalı kaydı sil', tehlike: true, eylem: () => cepSil(k) },
+                              ])}
+                            >⋯</button>
                           </td>
                         </tr>
                       ))}
@@ -2819,16 +2835,9 @@ export default function App() {
       {islemMenu && (
         <div className="islem-menu-perde" onClick={() => setIslemMenu(null)}>
           <div className="islem-menu" style={{ left: islemMenu.x, top: islemMenu.y }} onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => { const { b } = islemMenu; setIslemMenu(null); kayitYukle(b.id) }}>✏️ Güncelle</button>
-            <button onClick={() => { const { b } = islemMenu; setIslemMenu(null); setTutanakId(b.id) }}>📄 Zimmet Tutanağı</button>
-            {islemMenu.it && islemMenu.iade && (
-              <button onClick={() => {
-                const { b, it } = islemMenu; setIslemMenu(null)
-                setIadeOnizleme({ belge: b, kalemler: [it], iadeTarihi: it.iadeTarihi, teslimAlan: '' })
-              }}>📄 İade Tutanağı</button>
-            )}
-            <div className="islem-menu-ayrac" />
-            <button className="tehlike" onClick={() => { const { b } = islemMenu; setIslemMenu(null); kayitSil(b.id) }}>🗑 Hatalı kaydı sil</button>
+            {islemMenu.ogeler.map((o, i) => o === '-'
+              ? <div key={i} className="islem-menu-ayrac" />
+              : <button key={i} className={o.tehlike ? 'tehlike' : undefined} onClick={() => { setIslemMenu(null); o.eylem() }}>{o.etiket}</button>)}
           </div>
         </div>
       )}
